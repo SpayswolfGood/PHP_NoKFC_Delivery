@@ -1,384 +1,268 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>NO_KFC Delivery Panel</title>
-    <style>
-        :root {
-            --brand-red: #e4002b;
-            --brand-red-dark: #bf0024;
-            --brand-black: #111111;
-            --brand-white: #ffffff;
-            --brand-bg: #f4f4f4;
-            --brand-border: #e7e7e7;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: linear-gradient(180deg, #fbfbfb 0%, #f2f2f2 100%);
-            color: var(--brand-black);
-        }
-        .container { max-width: 1180px; margin: 0 auto; padding: 24px 16px 40px; }
-        .header {
-            background: var(--brand-white);
-            border: 1px solid var(--brand-border);
-            border-radius: 14px;
-            overflow: hidden;
-            margin-bottom: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-        }
-        .header-top {
-            height: 12px;
-            background: repeating-linear-gradient(90deg, var(--brand-red), var(--brand-red) 30px, #ffffff 30px, #ffffff 60px);
-        }
-        .header-main {
-            padding: 18px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-        }
-        .brand-wrap { display: flex; flex-direction: column; gap: 4px; }
-        h1 { margin: 0; font-size: 30px; letter-spacing: 1px; font-weight: 900; color: var(--brand-red); }
-        .subtitle { margin: 0; color: #575757; font-size: 13px; text-transform: uppercase; letter-spacing: .9px; font-weight: 700; }
-        .btn-refresh {
-            width: auto;
-            padding: 10px 14px;
-            border: 1px solid var(--brand-black);
-            border-radius: 10px;
-            background: var(--brand-white);
-            color: var(--brand-black);
-            cursor: pointer;
-            font-weight: 700;
-        }
-        .btn-refresh:hover { background: #f7f7f7; }
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .user-badge {
-            font-size: 13px;
-            font-weight: 700;
-            color: #4b4b4b;
-            background: #fff4f6;
-            border: 1px solid #ffd6df;
-            border-radius: 999px;
-            padding: 6px 10px;
-            white-space: nowrap;
-        }
-        .btn-logout {
-            width: auto;
-            padding: 10px 14px;
-            border: 1px solid var(--brand-red);
-            border-radius: 10px;
-            background: #fff4f6;
-            color: var(--brand-red);
-            cursor: pointer;
-            font-weight: 700;
-        }
-        .btn-logout:hover { background: #ffe9ef; }
-        .status {
-            margin: 0 0 16px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            background: #fff4f6;
-            border: 1px solid #ffd6df;
-            color: #7e2435;
-            font-size: 14px;
-        }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
-        .card {
-            background: var(--brand-white);
-            border-radius: 14px;
-            border: 1px solid var(--brand-border);
-            padding: 14px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-        }
-        .card-head {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .chip {
-            background: var(--brand-red);
-            color: var(--brand-white);
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: .4px;
-            padding: 3px 9px;
-        }
-        h2 { margin: 0; font-size: 18px; }
-        .row { display: flex; gap: 8px; margin-bottom: 8px; }
-        input, select, textarea, button {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #d9d9d9;
-            border-radius: 9px;
-            background: #fff;
-            color: var(--brand-black);
-            font-size: 14px;
-        }
-        textarea { min-height: 70px; resize: vertical; }
-        input:focus, select:focus, textarea:focus { outline: 2px solid #ffd4de; border-color: var(--brand-red); }
-        button {
-            border: 0;
-            background: linear-gradient(180deg, var(--brand-red), var(--brand-red-dark));
-            color: var(--brand-white);
-            cursor: pointer;
-            font-weight: 700;
-            transition: transform .12s ease, filter .12s ease;
-        }
-        button:hover { transform: translateY(-1px); filter: brightness(1.05); }
-        hr { border: 0; height: 1px; background: var(--brand-border); margin: 12px 0; }
-        ul { margin: 0; padding-left: 18px; }
-        li { margin: 8px 0; line-height: 1.35; }
-        .muted { color: #6a6a6a; font-size: 13px; }
-        .badge {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 2px 9px;
-            background: #ffe6ec;
-            color: #9f1736;
-            border: 1px solid #ffcfda;
-            font-size: 12px;
-            font-weight: 700;
-        }
-    </style>
+    <title>NO_KFC — Админ-панель</title>
+    @include('partials.panel-styles')
 </head>
 <body>
-<div class="container">
-    <header class="header">
-        <div class="header-top"></div>
-        <div class="header-main">
-            <div class="brand-wrap">
-                <h1>NO_KFC</h1>
-                <p class="subtitle">Delivery CRM Panel</p>
+<div class="panel-wrap">
+    <header class="panel-header">
+        <div class="panel-header-strip"></div>
+        <div class="panel-header-inner">
+            <div class="panel-brand">
+                <h1 class="panel-title">NO_KFC</h1>
+                <p class="panel-subtitle">Администрирование</p>
             </div>
-            <div class="header-actions">
-                <span class="user-badge">{{ auth()->user()->email }}</span>
-                <button class="btn-refresh" type="button" onclick="loadAll()">Refresh all</button>
-                <form method="POST" action="{{ route('logout') }}">
+            <div class="panel-actions">
+                <span class="user-pill" title="{{ auth()->user()->email }}">{{ auth()->user()->name }}</span>
+                <button class="btn btn-ghost btn-sm" type="button" onclick="loadAll()">Обновить</button>
+                <form method="POST" action="{{ route('logout') }}" style="margin:0;">
                     @csrf
-                    <button class="btn-logout" type="submit">Logout</button>
+                    <button class="btn btn-ghost" type="submit">Выйти</button>
                 </form>
             </div>
         </div>
     </header>
 
-    <div id="status" class="status">Ready. Use forms below to test API.</div>
+    <div id="status" class="flash">Готово. Добавьте блюда и сотрудников ниже.</div>
 
-    <div class="grid">
+    <div class="grid-2">
         <section class="card">
             <div class="card-head">
-                <span class="chip">NO_KFC</span>
-                <h2>Create customer</h2>
+                <span class="chip">Меню</span>
+                <h2 class="card-title">Каталог блюд</h2>
             </div>
-            <div class="row"><input id="customer-name" placeholder="Name"></div>
-            <div class="row"><input id="customer-phone" placeholder="Phone (+7999...)"></div>
-            <div class="row"><input id="customer-address" placeholder="Address"></div>
-            <div class="row"><textarea id="customer-comment" placeholder="Comment"></textarea></div>
-            <button onclick="createCustomer()">Create customer</button>
-            <hr>
-            <h2>Customers</h2>
-            <ul id="customers-list"></ul>
+            <div class="field">
+                <label for="dish-name">Название</label>
+                <input id="dish-name" type="text" placeholder="Например, Баскет 6 крыльев" autocomplete="off">
+            </div>
+            <div class="row-2">
+                <div class="field" style="margin-bottom:0;">
+                    <label for="dish-price">Цена, ₽</label>
+                    <input id="dish-price" type="number" step="0.01" min="0.01" placeholder="0.00">
+                </div>
+                <div class="field" style="margin-bottom:0;">
+                    <label for="dish-active">В продаже</label>
+                    <select id="dish-active">
+                        <option value="1" selected>Да</option>
+                        <option value="0">Нет (скрыто)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label for="dish-description">Описание</label>
+                <textarea id="dish-description" placeholder="Краткое описание для меню"></textarea>
+            </div>
+            <button class="btn btn-primary btn-block" type="button" onclick="createDish()">Добавить блюдо</button>
+            <hr class="sep">
+            <h3 class="card-title" style="font-size:1rem;margin-bottom:10px;">Список блюд</h3>
+            <div id="dishes-list" class="list-stack">
+                <div class="empty-state">Загрузка…</div>
+            </div>
         </section>
 
         <section class="card">
             <div class="card-head">
-                <span class="chip">MENU</span>
-                <h2>Create dish</h2>
+                <span class="chip">Персонал</span>
+                <h2 class="card-title">Учётные записи</h2>
             </div>
-            <div class="row"><input id="dish-name" placeholder="Dish name"></div>
-            <div class="row"><input id="dish-price" type="number" step="0.01" placeholder="Price"></div>
-            <div class="row"><textarea id="dish-description" placeholder="Description"></textarea></div>
-            <button onclick="createDish()">Create dish</button>
-            <hr>
-            <h2>Dishes</h2>
-            <ul id="dishes-list"></ul>
-        </section>
-
-        <section class="card">
-            <div class="card-head">
-                <span class="chip">ORDERS</span>
-                <h2>Create order</h2>
+            <div class="field">
+                <label for="staff-name">Имя</label>
+                <input id="staff-name" type="text" placeholder="ФИО или позывной">
             </div>
-            <div class="row">
-                <select id="order-customer"></select>
+            <div class="field">
+                <label for="staff-email">Email (логин)</label>
+                <input id="staff-email" type="email" autocomplete="off" placeholder="staff@example.com">
             </div>
-            <div class="row">
-                <select id="order-dish-1"></select>
-                <input id="order-qty-1" type="number" min="1" value="1">
+            <div class="field">
+                <label for="staff-password">Пароль</label>
+                <input id="staff-password" type="password" autocomplete="new-password" placeholder="Не менее 8 символов">
             </div>
-            <div class="row">
-                <select id="order-dish-2"></select>
-                <input id="order-qty-2" type="number" min="1" value="1">
+            <div class="field">
+                <label for="staff-role">Роль</label>
+                <select id="staff-role">
+                    <option value="kitchen">Кухня</option>
+                    <option value="courier">Курьер</option>
+                    <option value="admin">Администратор</option>
+                </select>
             </div>
-            <div class="row"><input id="order-address" placeholder="Delivery address"></div>
-            <div class="row"><textarea id="order-note" placeholder="Order note"></textarea></div>
-            <button onclick="createOrder()">Create order</button>
-            <hr>
-            <h2>Orders</h2>
-            <ul id="orders-list"></ul>
+            <button class="btn btn-primary btn-block" type="button" onclick="createStaff()">Создать сотрудника</button>
+            <hr class="sep">
+            <h3 class="card-title" style="font-size:1rem;margin-bottom:10px;">Сотрудники</h3>
+            <div id="staff-list" class="list-stack">
+                <div class="empty-state">Загрузка…</div>
+            </div>
         </section>
     </div>
 </div>
 
 <script>
-const api = "/api/v1";
-const statusEl = document.getElementById("status");
+const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+const statusEl = document.getElementById('status');
+
+const roleRu = {
+    admin: 'Админ',
+    kitchen: 'Кухня',
+    courier: 'Курьер'
+};
 
 function setStatus(text, isError = false) {
+    statusEl.style.display = 'block';
     statusEl.textContent = text;
-    statusEl.style.background = isError ? "#ffe8ed" : "#fff4f6";
-    statusEl.style.borderColor = isError ? "#ffc9d6" : "#ffd6df";
-    statusEl.style.color = isError ? "#9f1736" : "#7e2435";
+    statusEl.classList.toggle('is-error', isError);
 }
 
-async function request(url, options = {}) {
+async function api(url, method = 'GET', body = null) {
     const response = await fetch(url, {
-        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-        ...options
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': token,
+            'Accept': 'application/json'
+        },
+        body: body ? JSON.stringify(body) : null
     });
 
-    let data = null;
-    try { data = await response.json(); } catch (_) {}
+    if (response.status === 204) return null;
 
     if (!response.ok) {
-        throw new Error(data?.message || "Request failed");
+        const error = await response.json().catch(() => ({}));
+        const msg = error.message || (error.errors ? Object.values(error.errors).flat().join(' ') : 'Ошибка запроса');
+        throw new Error(msg);
     }
-    return data;
+
+    return response.json();
 }
 
-async function loadCustomers() {
-    const data = await request(`${api}/customers`);
-    const customers = data.data || [];
-    const list = document.getElementById("customers-list");
-    const select = document.getElementById("order-customer");
-    list.innerHTML = "";
-    select.innerHTML = "";
-
-    customers.forEach(c => {
-        const li = document.createElement("li");
-        li.innerHTML = `<strong>${c.name}</strong> <span class="badge">${c.phone}</span><br><span class="muted">${c.address}</span>`;
-        list.appendChild(li);
-
-        const option = document.createElement("option");
-        option.value = c.id;
-        option.textContent = `${c.name} (${c.phone})`;
-        select.appendChild(option);
-    });
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 async function loadDishes() {
-    const data = await request(`${api}/dishes`);
-    const dishes = data.data || [];
-    const list = document.getElementById("dishes-list");
-    const dish1 = document.getElementById("order-dish-1");
-    const dish2 = document.getElementById("order-dish-2");
-    list.innerHTML = "";
-    dish1.innerHTML = "";
-    dish2.innerHTML = "";
-
-    dishes.forEach(d => {
-        const li = document.createElement("li");
-        li.innerHTML = `<strong>${d.name}</strong> - ${d.price}`;
-        list.appendChild(li);
-
-        [dish1, dish2].forEach(select => {
-            const option = document.createElement("option");
-            option.value = d.id;
-            option.textContent = `${d.name} (${d.price})`;
-            select.appendChild(option);
-        });
-    });
-}
-
-async function loadOrders() {
-    const data = await request(`${api}/orders`);
-    const orders = data.data || [];
-    const list = document.getElementById("orders-list");
-    list.innerHTML = "";
-    orders.forEach(o => {
-        const li = document.createElement("li");
-        li.innerHTML = `#${o.id} <span class="badge">${o.status}</span> total: <strong>${o.total_amount}</strong><br><span class="muted">${o.delivery_address}</span>`;
-        list.appendChild(li);
-    });
-}
-
-async function createCustomer() {
+    const list = document.getElementById('dishes-list');
     try {
-        await request(`${api}/customers`, {
-            method: "POST",
-            body: JSON.stringify({
-                name: document.getElementById("customer-name").value,
-                phone: document.getElementById("customer-phone").value,
-                address: document.getElementById("customer-address").value,
-                comment: document.getElementById("customer-comment").value
-            })
-        });
-        setStatus("Customer created");
-        await loadCustomers();
+        const dishes = await api('/app-api/admin/dishes');
+        if (!dishes.length) {
+            list.innerHTML = '<div class="empty-state">Блюд пока нет.</div>';
+            return;
+        }
+        list.innerHTML = dishes.map((dish) => `
+            <div class="list-item">
+                <div style="flex:1;min-width:0;">
+                    <strong>${escapeHtml(dish.name)}</strong>
+                    <span class="badge" style="margin-left:8px;">${Number(dish.price).toFixed(2)} ₽</span>
+                    ${dish.is_active ? '' : '<span class="badge badge-warn" style="margin-left:8px;">Скрыто</span>'}
+                    <div class="muted" style="margin-top:6px;">${dish.description ? escapeHtml(dish.description) : 'Без описания'}</div>
+                </div>
+                <button type="button" class="btn btn-danger-outline btn-sm" onclick="deleteDish(${dish.id})">Удалить</button>
+            </div>
+        `).join('');
     } catch (e) {
-        setStatus(`Customer error: ${e.message}`, true);
+        list.innerHTML = `<div class="empty-state">${escapeHtml(e.message)}</div>`;
+        setStatus(e.message, true);
     }
 }
 
 async function createDish() {
+    const name = document.getElementById('dish-name').value.trim();
+    const price = Number(document.getElementById('dish-price').value);
+    const description = document.getElementById('dish-description').value.trim();
+    const is_active = document.getElementById('dish-active').value === '1';
+
+    if (!name || !price || price <= 0) {
+        setStatus('Укажите название и корректную цену.', true);
+        return;
+    }
+
     try {
-        await request(`${api}/dishes`, {
-            method: "POST",
-            body: JSON.stringify({
-                name: document.getElementById("dish-name").value,
-                price: Number(document.getElementById("dish-price").value),
-                description: document.getElementById("dish-description").value
-            })
-        });
-        setStatus("Dish created");
+        await api('/app-api/admin/dishes', 'POST', { name, price, description: description || null, is_active });
+        setStatus('Блюдо добавлено.', false);
+        document.getElementById('dish-name').value = '';
+        document.getElementById('dish-price').value = '';
+        document.getElementById('dish-description').value = '';
         await loadDishes();
     } catch (e) {
-        setStatus(`Dish error: ${e.message}`, true);
+        setStatus(e.message, true);
     }
 }
 
-async function createOrder() {
+async function deleteDish(id) {
+    if (!confirm('Удалить это блюдо?')) return;
     try {
-        const dish1 = Number(document.getElementById("order-dish-1").value);
-        const dish2 = Number(document.getElementById("order-dish-2").value);
-        const items = [
-            { dish_id: dish1, quantity: Number(document.getElementById("order-qty-1").value || 1) }
-        ];
-        if (dish2 && dish2 !== dish1) {
-            items.push({ dish_id: dish2, quantity: Number(document.getElementById("order-qty-2").value || 1) });
-        }
-
-        await request(`${api}/orders`, {
-            method: "POST",
-            body: JSON.stringify({
-                customer_id: Number(document.getElementById("order-customer").value),
-                delivery_address: document.getElementById("order-address").value,
-                note: document.getElementById("order-note").value,
-                items
-            })
-        });
-        setStatus("Order created");
-        await loadOrders();
+        await api(`/app-api/admin/dishes/${id}`, 'DELETE');
+        setStatus('Блюдо удалено.', false);
+        await loadDishes();
     } catch (e) {
-        setStatus(`Order error: ${e.message}`, true);
+        setStatus(e.message, true);
+    }
+}
+
+async function loadStaff() {
+    const list = document.getElementById('staff-list');
+    try {
+        const staff = await api('/app-api/admin/staff');
+        if (!staff.length) {
+            list.innerHTML = '<div class="empty-state">Сотрудников пока нет.</div>';
+            return;
+        }
+        list.innerHTML = staff.map((user) => `
+            <div class="list-item">
+                <div>
+                    <strong>${escapeHtml(user.name)}</strong>
+                    <span class="badge" style="margin-left:8px;">${roleRu[user.role] || user.role}</span>
+                    <div class="muted" style="margin-top:6px;">${escapeHtml(user.email)}</div>
+                </div>
+                <button type="button" class="btn btn-danger-outline btn-sm" onclick="deleteStaff(${user.id})">Удалить</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        list.innerHTML = `<div class="empty-state">${escapeHtml(e.message)}</div>`;
+        setStatus(e.message, true);
+    }
+}
+
+async function createStaff() {
+    try {
+        await api('/app-api/admin/staff', 'POST', {
+            name: document.getElementById('staff-name').value.trim(),
+            email: document.getElementById('staff-email').value.trim(),
+            password: document.getElementById('staff-password').value,
+            role: document.getElementById('staff-role').value
+        });
+        setStatus('Сотрудник создан.', false);
+        document.getElementById('staff-name').value = '';
+        document.getElementById('staff-email').value = '';
+        document.getElementById('staff-password').value = '';
+        await loadStaff();
+    } catch (e) {
+        setStatus(e.message, true);
+    }
+}
+
+async function deleteStaff(id) {
+    if (!confirm('Удалить учётную запись сотрудника?')) return;
+    try {
+        await api(`/app-api/admin/staff/${id}`, 'DELETE');
+        setStatus('Запись удалена.', false);
+        await loadStaff();
+    } catch (e) {
+        setStatus(e.message, true);
     }
 }
 
 async function loadAll() {
     try {
-        await Promise.all([loadCustomers(), loadDishes(), loadOrders()]);
-        setStatus("Data refreshed");
+        await Promise.all([loadDishes(), loadStaff()]);
+        setStatus('Данные обновлены.', false);
     } catch (e) {
-        setStatus(`Load error: ${e.message}`, true);
+        setStatus(e.message, true);
     }
 }
 
