@@ -5,9 +5,6 @@ namespace Database\Factories;
 use App\Models\Dish;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/**
- * @extends Factory<Dish>
- */
 class DishFactory extends Factory
 {
     protected $model = Dish::class;
