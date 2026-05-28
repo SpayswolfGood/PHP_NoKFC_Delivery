@@ -12,6 +12,12 @@
             --accent-soft: #fff7ed;
             --accent-border: #fed7aa;
         }
+        .grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        @media (min-width: 768px) { .grid-2 { grid-template-columns: 1.2fr 0.8fr; } }
+        .ingredient-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .ingredient-item:last-child { border-bottom: none; }
+        .toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; user-select: none; }
+        .toggle-wrap input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
     </style>
 </head>
 <body>
@@ -25,7 +31,7 @@
             </div>
             <div class="panel-actions">
                 <span class="user-pill">{{ auth()->user()->name }}</span>
-                <button class="btn btn-ghost btn-sm" type="button" onclick="loadOrders()">Обновить</button>
+                <button class="btn btn-ghost btn-sm" type="button" onclick="refreshAll()">Обновить всё</button>
                 <form method="POST" action="{{ route('logout') }}" style="margin:0;">
                     @csrf
                     <button class="btn btn-ghost" type="submit">Выйти</button>
@@ -36,15 +42,27 @@
 
     <div id="flash" class="flash" style="display:none;"></div>
 
-    <section class="card">
-        <div class="card-head">
-            <span class="chip">Очередь</span>
-            <h2 class="card-title">Заказы в работе</h2>
-        </div>
-        <div id="orders-wrap" class="list-stack">
-            <div class="empty-state">Загрузка…</div>
-        </div>
-    </section>
+    <div class="grid-2">
+        <section class="card">
+            <div class="card-head">
+                <span class="chip">Очередь</span>
+                <h2 class="card-title">Заказы в работе</h2>
+            </div>
+            <div id="orders-wrap" class="list-stack">
+                <div class="empty-state">Загрузка заказов…</div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-head">
+                <span class="chip">Склад</span>
+                <h2 class="card-title">Наличие ингредиентов</h2>
+            </div>
+            <div id="ingredients-wrap" class="list-stack">
+                <div class="empty-state">Загрузка склада…</div>
+            </div>
+        </section>
+    </div>
 </div>
 
 <script>
@@ -61,23 +79,29 @@ function showFlash(text, isError = false) {
     flashEl.style.display = 'block';
     flashEl.textContent = text;
     flashEl.classList.toggle('is-error', isError);
+    setTimeout(() => { flashEl.style.display = 'none'; }, 5000);
 }
 
-async function api(url, method = 'GET') {
-    const response = await fetch(url, {
+async function api(url, method = 'GET', body = null) {
+    const options = {
         method,
         headers: {
             'X-CSRF-TOKEN': token,
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
         }
-    });
+    };
+    if (body) options.body = JSON.stringify(body);
+
+    const response = await fetch(url, options);
     if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.message || 'Ошибка запроса');
     }
-    return response.json();
+    return response.status !== 204 ? response.json() : null;
 }
 
+/* ── Заказы ── */
 async function loadOrders() {
     const wrap = document.getElementById('orders-wrap');
     try {
@@ -121,9 +145,7 @@ async function setPreparing(id) {
         await api(`/app-api/kitchen/orders/${id}/preparing`, 'PATCH');
         showFlash('Заказ переведён в «Готовится».', false);
         await loadOrders();
-    } catch (e) {
-        showFlash(e.message, true);
-    }
+    } catch (e) { showFlash(e.message, true); }
 }
 
 async function setReady(id) {
@@ -131,8 +153,41 @@ async function setReady(id) {
         await api(`/app-api/kitchen/orders/${id}/ready`, 'PATCH');
         showFlash('Заказ готов к выдаче курьеру.', false);
         await loadOrders();
+    } catch (e) { showFlash(e.message, true); }
+}
+
+/* ── Склад ингредиентов ── */
+async function loadIngredients() {
+    const wrap = document.getElementById('ingredients-wrap');
+    try {
+        const ingredients = await api('/app-api/kitchen/ingredients');
+        if (!ingredients.length) {
+            wrap.innerHTML = '<div class="empty-state">Список ингредиентов пуст.</div>';
+            return;
+        }
+        wrap.innerHTML = ingredients.map((ing) => `
+            <div class="ingredient-item">
+                <span style="font-weight: 500; color: #222;">${escapeHtml(ing.name)}</span>
+                <label class="toggle-wrap">
+                    <input type="checkbox" ${ing.is_available ? 'checked' : ''} 
+                           onchange="toggleIngredient(${ing.id}, this.checked)">
+                    <span class="muted" style="font-size:0.8rem;">${ing.is_available ? 'В наличии' : 'Нет'}</span>
+                </label>
+            </div>
+        `).join('');
+    } catch (e) {
+        wrap.innerHTML = `<div class="empty-state">${escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function toggleIngredient(id, isChecked) {
+    try {
+        await api(`/app-api/kitchen/ingredients/${id}`, 'PATCH', { is_available: isChecked });
+        showFlash('Доступность ингредиента обновлена.', false);
+        await loadIngredients();
     } catch (e) {
         showFlash(e.message, true);
+        await loadIngredients(); // Откатываем чекбокс назад при ошибке
     }
 }
 
@@ -144,7 +199,12 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-loadOrders();
+function refreshAll() {
+    loadOrders();
+    loadIngredients();
+}
+
+refreshAll();
 </script>
 </body>
 </html>

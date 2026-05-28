@@ -8,74 +8,139 @@ use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class CustomerOrderController extends Controller
 {
+
+    private function getTimeBasedExtraMinutes(): int
+    {
+        $currentHour = (int) Carbon::now()->format('H');
+        
+        if ($currentHour >= 12 && $currentHour < 15) {
+            return 15;
+        }
+        
+        if ($currentHour >= 8 && $currentHour < 12) {
+            return 10;
+        }
+
+        return 5;
+    }
+
+    public function index(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $orders = Order::query()
+            ->where('customer_id', $user->customer_id)
+            ->with('items.dish')
+            ->latest()
+            ->get();
+
+        return response()->json($orders);
+    }
+
     public function dishes(): JsonResponse
     {
         return response()->json(
-            Dish::query()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get()
-        );
-    }
-
-    public function index(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        return response()->json(
-            Order::query()
-                ->with(['items.dish', 'courier:id,name'])
-                ->where('customer_id', $user->customer_id)
-                ->latest()
-                ->get()
+            Dish::query()->availableForOrder()->latest()->get()
         );
     }
 
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $validated = $request->validate([
-            'delivery_address' => ['required', 'string', 'max:255'],
-            'note' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.dish_id' => ['required', 'integer', 'exists:dishes,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        $request->validate([
+            'delivery_address' => 'required|string',
+            'items' => 'required|array|min:1',
+            'items.*.dish_id' => 'required|exists:dishes,id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        $order = DB::transaction(function () use ($validated, $user) {
-            $order = Order::create([
-                'customer_id' => $user->customer_id,
-                'status' => 'new',
-                'delivery_address' => $validated['delivery_address'],
-                'note' => $validated['note'] ?? null,
-                'total_amount' => 0,
-            ]);
+        $user = $request->user();
 
-            $dishIds = collect($validated['items'])->pluck('dish_id')->unique()->values();
-            $dishes = Dish::query()->whereIn('id', $dishIds)->get()->keyBy('id');
+        return DB::transaction(function () use ($request, $user) {
             $totalAmount = 0;
+            $maxPrepTime = 0; 
+            $orderItemsData = [];
 
-            foreach ($validated['items'] as $item) {
-                $dish = $dishes->get($item['dish_id']);
-                $quantity = (int) $item['quantity'];
-                $unitPrice = (float) $dish->price;
-                $totalAmount += $unitPrice * $quantity;
+            foreach ($request->input('items') as $item) {
+                $dish = Dish::query()->with('ingredients')->findOrFail($item['dish_id']);
+                $orderedQty = $item['quantity'];
 
-                $order->items()->create([
+                foreach ($dish->ingredients as $ingredient) {
+                    $requiredAmount = $ingredient->pivot->amount * $orderedQty;
+
+                    if ($ingredient->quantity < $requiredAmount) {
+                        return response()->json(['message' => "Недостаточно ингредиентов для блюда '{$dish->name}' ({$ingredient->name})."], 422, [], JSON_UNESCAPED_UNICODE);
+                    }
+                }
+
+                foreach ($dish->ingredients as $ingredient) {
+                    $requiredAmount = $ingredient->pivot->amount * $orderedQty;
+                    $ingredient->decrement('quantity', $requiredAmount);
+                }
+
+                $totalAmount += $dish->price * $orderedQty;
+                if ($dish->preparation_time > $maxPrepTime) {
+                    $maxPrepTime = $dish->preparation_time;
+                }
+
+                $orderItemsData[] = [
                     'dish_id' => $dish->id,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                ]);
+                    'quantity' => $orderedQty,
+                    'unit_price' => $dish->price,
+                ];
             }
 
-            $order->update(['total_amount' => round($totalAmount, 2)]);
+            $extraMinutes = $this->getTimeBasedExtraMinutes();
+            $estimatedMinutes = $maxPrepTime + $extraMinutes;
 
-            return $order;
+            $existingNote = trim((string) $request->input('note', ''));
+            $etaNote = "{$estimatedMinutes} min";
+
+            $order = Order::create([
+                'customer_id' => $user->customer_id,
+                'delivery_address' => $request->input('delivery_address'),
+                'total_amount' => $totalAmount,
+                'status' => 'new',
+                'delivery_time' => now()->addMinutes($estimatedMinutes),
+                'note' => $existingNote !== '' ? "{$existingNote} | {$etaNote}" : $etaNote,
+            ]);
+
+            $order->items()->createMany($orderItemsData);
+
+            return response()->json($order->load('items.dish'), 201, [], JSON_UNESCAPED_UNICODE);
         });
+    }
 
-        return response()->json($order->load('items.dish'), 201);
+    public function cancel(Order $order): JsonResponse
+    {
+        $user = auth()->user();
+
+        if ($order->customer_id !== $user->customer_id) {
+            return response()->json(['message' => 'Доступ запрещен.'], 403, [], JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($order->status !== 'new') {
+            return response()->json(['message' => 'Нельзя отменить заказ, который уже готовится или доставлен.'], 422, [], JSON_UNESCAPED_UNICODE);
+        }
+
+        return DB::transaction(function () use ($order) {
+            $order->load('items.dish.ingredients');
+
+            foreach ($order->items as $item) {
+                if ($item->dish) {
+                    foreach ($item->dish->ingredients as $ingredient) {
+                        $returnedAmount = $ingredient->pivot->amount * $item->quantity;
+                        $ingredient->increment('quantity', $returnedAmount);
+                    }
+                }
+            }
+
+            $order->update(['status' => 'cancelled']);
+
+            return response()->json(['message' => 'Заказ успешно отменен.', 'order' => $order], 200, [], JSON_UNESCAPED_UNICODE);
+        });
     }
 }
