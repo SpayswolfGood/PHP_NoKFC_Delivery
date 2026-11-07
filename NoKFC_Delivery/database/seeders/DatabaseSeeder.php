@@ -81,5 +81,7 @@ class DatabaseSeeder extends Seeder
                 ],
             ]);
         });
+
+        $this->call(RestaurantTableSeeder::class);
     }
 }

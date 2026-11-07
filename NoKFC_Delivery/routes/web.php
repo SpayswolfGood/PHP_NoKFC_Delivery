@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\AppApi\AdminDishController;
 use App\Http\Controllers\AppApi\AdminOrderController;
+use App\Http\Controllers\AppApi\AdminReservationController;
 use App\Http\Controllers\AppApi\AdminStaffController;
 use App\Http\Controllers\AppApi\CourierOrderController;
 use App\Http\Controllers\AppApi\CustomerOrderController;
 use App\Http\Controllers\AppApi\KitchenOrderController;
+use App\Http\Controllers\AppApi\ReservationController;
 use App\Http\Controllers\ProfileController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +41,12 @@ Route::middleware('auth')->group(function () {
             Route::get('/customer/orders', [CustomerOrderController::class, 'index']);
             Route::post('/customer/orders', [CustomerOrderController::class, 'store']);
             Route::patch('/customer/orders/{order}/cancel', [CustomerOrderController::class, 'cancel']);
+
+            Route::get('/customer/restaurants', [ReservationController::class, 'restaurants']);
+            Route::get('/customer/tables/available', [ReservationController::class, 'availableTables']);
+            Route::get('/customer/reservations', [ReservationController::class, 'index']);
+            Route::post('/customer/reservations', [ReservationController::class, 'store']);
+            Route::patch('/customer/reservations/{reservation}/cancel', [ReservationController::class, 'cancel']);
         });
 
         // ── Kitchen ──────────────────────────────────────────────
@@ -87,6 +95,13 @@ Route::middleware('auth')->group(function () {
             Route::post('/admin/ingredients', [AdminDishController::class, 'storeIngredient']);
             Route::put('/admin/ingredients/{id}', [AdminDishController::class, 'updateIngredient']);
             Route::delete('/admin/ingredients/{id}', [AdminDishController::class, 'destroyIngredient']);
+
+            Route::get('/admin/reservations', [AdminReservationController::class, 'index']);
+            Route::patch('/admin/reservations/{reservation}/status', [AdminReservationController::class, 'updateStatus']);
+            Route::delete('/admin/reservations/{reservation}', [AdminReservationController::class, 'destroy']);
+            Route::get('/admin/tables', [AdminReservationController::class, 'tables']);
+            Route::post('/admin/tables', [AdminReservationController::class, 'storeTable']);
+            Route::delete('/admin/tables/{table}', [AdminReservationController::class, 'destroyTable']);
         });
     });
 

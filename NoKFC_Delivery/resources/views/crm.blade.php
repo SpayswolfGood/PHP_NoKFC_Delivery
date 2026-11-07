@@ -410,6 +410,8 @@
         <button class="tab-btn"        onclick="switchTab('dishes')">Меню</button>
         <button class="tab-btn"        onclick="switchTab('inventory')">Склад</button>
         <button class="tab-btn"        onclick="switchTab('staff')">Персонал</button>
+        <button class="tab-btn"        onclick="switchTab('reservations')">Бронирования</button>
+        <button class="tab-btn"        onclick="switchTab('tables')">Столики</button>
     </nav>
 
     <div id="tab-orders" class="tab-pane active" style="padding:24px;">
@@ -504,6 +506,58 @@
             </section>
         </div>
     </div>
+
+    <!-- ══ БРОНИРОВАНИЯ СТОЛИКОВ ══ -->
+    <div id="tab-reservations" class="tab-pane" style="padding:24px;">
+        <div class="filter-bar">
+            <select id="res-filter-status" onchange="loadReservationsAdmin()">
+                <option value="">Все статусы</option>
+                <option value="confirmed">Подтверждённые</option>
+                <option value="completed">Завершённые</option>
+                <option value="cancelled">Отменённые</option>
+            </select>
+            <input id="res-filter-date" type="date" onchange="loadReservationsAdmin()" placeholder="Дата">
+            <input id="res-filter-search" type="text" placeholder="Поиск по клиенту / телефону…" oninput="loadReservationsAdmin()">
+            <button class="btn-icon" onclick="loadReservationsAdmin()">Обновить список</button>
+        </div>
+        <div id="reservations-admin-list"><div class="empty-state">Загрузка…</div></div>
+    </div>
+
+    <!-- ══ СТОЛИКИ ЗАВЕДЕНИЙ ══ -->
+    <div id="tab-tables" class="tab-pane" style="padding:24px;">
+        <div class="grid-2">
+            <section class="card" style="padding:24px; margin-bottom:20px;">
+                <div class="card-head" style="margin-bottom:20px;">
+                    <h2 class="card-title" style="margin:0; font-size:1.2rem; color:#1e293b;">Добавить столик</h2>
+                </div>
+                <div class="field" style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:500;">Ресторан (адрес заведения)</label>
+                    <select id="new-table-restaurant" style="width:100%; box-sizing:border-box;"></select>
+                </div>
+                <div class="field" style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:500;">Номер столика</label>
+                    <input id="new-table-number" type="text" placeholder="Например, 7 или 2A" style="width:100%; box-sizing:border-box;">
+                </div>
+                <div class="field" style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:500;">Количество мест (от 2 до 6 мест)</label>
+                    <select id="new-table-seats" style="width:100%; box-sizing:border-box;">
+                        <option value="2">2 места</option>
+                        <option value="3">3 места</option>
+                        <option value="4" selected>4 места</option>
+                        <option value="5">5 мест</option>
+                        <option value="6">6 мест</option>
+                    </select>
+                </div>
+                <button class="btn-save" style="width:100%;" onclick="createAdminTable()">Создать столик</button>
+            </section>
+            <section class="card" style="padding:24px;">
+                <div class="card-head" style="margin-bottom:20px;">
+                    <h2 class="card-title" style="margin:0; font-size:1.2rem; color:#1e293b;">Столики в ресторанах</h2>
+                </div>
+                <div id="admin-tables-list" class="list-stack"><div class="empty-state">Загрузка…</div></div>
+            </section>
+        </div>
+    </div>
 </div>
 
 <div id="order-modal" class="modal-overlay" onclick="closeOrderModal(event)">
@@ -589,7 +643,7 @@ function previewImage(input,previewId){
 async function loadAll(){
     setStatus('Обновление данных…');
     await loadInventory();
-    await Promise.all([loadOrders(), loadDishes(), loadStaff()]);
+    await Promise.all([loadOrders(), loadDishes(), loadStaff(), loadReservationsAdmin(), loadAdminTables()]);
     statusEl.style.display='none';
 }
 
@@ -929,6 +983,164 @@ async function deleteStaff(id){
     if(!confirm('Удалить сотрудника?'))return;
     try{await api('/app-api/admin/staff/' + id,'DELETE');setStatus('Сотрудник удален.');await loadAll()}
     catch(e){setStatus(e.message,true)}
+}
+
+/* ══ БРОНИРОВАНИЯ (ADMIN) ══ */
+const resStatusRu = {
+    confirmed: { text: 'Подтверждено', badge: 's-confirmed' },
+    completed: { text: 'Завершено', badge: 's-delivered' },
+    cancelled: { text: 'Отменено', badge: 's-cancelled' }
+};
+
+async function loadReservationsAdmin(){
+    const list = document.getElementById('reservations-admin-list');
+    const status = document.getElementById('res-filter-status').value;
+    const date = document.getElementById('res-filter-date').value;
+    const search = document.getElementById('res-filter-search').value.trim();
+
+    let url = '/app-api/admin/reservations?';
+    if(status) url += '&status=' + encodeURIComponent(status);
+    if(date) url += '&date=' + encodeURIComponent(date);
+    if(search) url += '&search=' + encodeURIComponent(search);
+
+    try {
+        const reservations = await api(url);
+        if(!reservations.length){
+            list.innerHTML = '<div class="empty-state">Бронирований не найдено.</div>';
+            return;
+        }
+
+        list.innerHTML = reservations.map(r => {
+            const st = resStatusRu[r.status] || { text: r.status, badge: '' };
+            const rest = r.table?.restaurant;
+            const dateStr = new Date(r.reservation_date).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
+
+            return '<div class="order-card">' +
+                '<div class="order-meta">' +
+                    '<span class="order-id">Бронь #' + r.id + '</span>' +
+                    '<span class="order-addr">📍 ' + esc(rest?.name || '') + ' (' + esc(rest?.address || '') + ')</span>' +
+                    '<span class="status-badge ' + st.badge + '">' + st.text + '</span>' +
+                '</div>' +
+                '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:8px; font-size:.9rem;">' +
+                    '<div>' +
+                        '🪑 <strong>Стол №' + esc(r.table?.table_number) + '</strong> (' + r.table?.seats + ' мест) | ' +
+                        '👥 Гостей: <strong>' + r.guest_count + '</strong>' +
+                    '</div>' +
+                    '<div style="color:#e8372a; font-weight:600;">' +
+                        '📅 ' + dateStr + ' с ' + r.start_time.slice(0,5) + ' до ' + r.end_time.slice(0,5) +
+                    '</div>' +
+                '</div>' +
+                '<div style="font-size:.85rem; color:#475569; margin-bottom:12px;">' +
+                    '👤 Клиент: <strong>' + esc(r.contact_name) + '</strong> | 📞 <strong>' + esc(r.contact_phone) + '</strong>' +
+                    (r.note ? '<div style="color:#64748b; margin-top:4px;">Пожелания: <em>' + esc(r.note) + '</em></div>' : '') +
+                '</div>' +
+                '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">' +
+                    '<span style="font-size:.85rem; color:#64748b; margin-right:4px;">Сменить статус:</span>' +
+                    (r.status !== 'completed' ? '<button class="btn-icon btn-edit" onclick="setReservationStatus(' + r.id + ', \'completed\')">✓ Завершить</button>' : '') +
+                    (r.status !== 'cancelled' ? '<button class="btn-icon btn-del" onclick="setReservationStatus(' + r.id + ', \'cancelled\')">✕ Отменить</button>' : '') +
+                    (r.status !== 'confirmed' ? '<button class="btn-icon" onclick="setReservationStatus(' + r.id + ', \'confirmed\')">Вернуть в работу</button>' : '') +
+                    '<button class="btn-icon btn-del" style="margin-left:auto;" onclick="deleteReservation(' + r.id + ')">Удалить</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    } catch(e) {
+        list.innerHTML = '<div class="empty-state">' + esc(e.message) + '</div>';
+    }
+}
+
+async function setReservationStatus(id, status){
+    try {
+        await api('/app-api/admin/reservations/' + id + '/status', 'PATCH', { status });
+        setStatus('Статус бронирования #' + id + ' обновлен.');
+        await loadReservationsAdmin();
+    } catch(e) {
+        setStatus(e.message, true);
+    }
+}
+
+async function deleteReservation(id){
+    if(!confirm('Удалить бронирование #' + id + '?')) return;
+    try {
+        await api('/app-api/admin/reservations/' + id, 'DELETE');
+        setStatus('Бронирование удалено.');
+        await loadReservationsAdmin();
+    } catch(e) {
+        setStatus(e.message, true);
+    }
+}
+
+/* ══ СТОЛИКИ (ADMIN) ══ */
+async function loadAdminTables(){
+    const restSelect = document.getElementById('new-table-restaurant');
+    const list = document.getElementById('admin-tables-list');
+
+    try {
+        const [restaurants, tables] = await Promise.all([
+            api('/app-api/customer/restaurants'),
+            api('/app-api/admin/tables')
+        ]);
+
+        if (restSelect) {
+            restSelect.innerHTML = restaurants.map(r =>
+                '<option value="' + r.id + '">' + esc(r.name) + ' (' + esc(r.address) + ')</option>'
+            ).join('');
+        }
+
+        if(!tables.length){
+            list.innerHTML = '<div class="empty-state">Столики еще не созданы.</div>';
+            return;
+        }
+
+        list.innerHTML = tables.map(t =>
+            '<div class="order-card" style="margin-bottom:8px; padding:14px;">' +
+                '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                    '<div>' +
+                        '<strong>Стол №' + esc(t.table_number) + '</strong> ' +
+                        '<span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:.8rem; margin-left:6px;">🪑 ' + t.seats + ' мест</span>' +
+                        '<div class="muted" style="font-size:.85rem; margin-top:4px;">📍 ' + esc(t.restaurant?.name || '') + ' (' + esc(t.restaurant?.address || '') + ')</div>' +
+                    '</div>' +
+                    '<button class="btn-icon btn-del" onclick="deleteAdminTable(' + t.id + ', \'' + esc(t.table_number) + '\')">Удалить</button>' +
+                '</div>' +
+            '</div>'
+        ).join('');
+    } catch(e) {
+        list.innerHTML = '<div class="empty-state">' + esc(e.message) + '</div>';
+    }
+}
+
+async function createAdminTable(){
+    const restId = document.getElementById('new-table-restaurant').value;
+    const number = document.getElementById('new-table-number').value.trim();
+    const seats = parseInt(document.getElementById('new-table-seats').value, 10);
+
+    if(!restId || !number){
+        setStatus('Укажите ресторан и номер столика.', true);
+        return;
+    }
+
+    try {
+        await api('/app-api/admin/tables', 'POST', {
+            restaurant_id: restId,
+            table_number: number,
+            seats: seats
+        });
+        setStatus('Столик успешно добавлен.');
+        document.getElementById('new-table-number').value = '';
+        await loadAdminTables();
+    } catch(e) {
+        setStatus(e.message, true);
+    }
+}
+
+async function deleteAdminTable(id, num){
+    if(!confirm('Удалить стол №' + num + '?')) return;
+    try {
+        await api('/app-api/admin/tables/' + id, 'DELETE');
+        setStatus('Стол удален.');
+        await loadAdminTables();
+    } catch(e) {
+        setStatus(e.message, true);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', loadAll);
